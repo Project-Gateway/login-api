@@ -80,7 +80,7 @@ class AuthController extends Controller
      */
     public function refresh()
     {
-        return response($this->authService->retrieveLoginResponse(auth()->refresh()));
+        return response($this->authService->retrieveLoginResponse(app('auth')->refresh()));
     }
 
 
@@ -108,11 +108,11 @@ class AuthController extends Controller
     {
 
         /** @var SocialiteUser $socialiteUser */
-        $socialiteUser = $this->authService->retrieveSocialUser($provider, request()->query('redirectUri'));
+        $socialiteUser = $this->authService->retrieveSocialUser($provider, app('request')->query('redirectUri'));
 
         // user already registered with this social account
-        if ($socialAccount = SocialAccount::where(['social_id' => $socialiteUser->getId()])->with('user')->first()) {
-            return response($this->authService->retrieveLoginResponse(auth()->login($socialAccount->user)));
+        if ($socialAccount = SocialAccount::where(['social_id' => $socialiteUser->getId()])->with('account')->first()) {
+            return response($this->authService->retrieveLoginResponse(app('auth')->login($socialAccount->account)));
         }
 
         // user not registered, but email exists
@@ -127,13 +127,13 @@ class AuthController extends Controller
             $user->save();
             $userEmail = new AccountEmail();
             $userEmail->fill([
-                'user_id' => $user->id,
+                'account_id' => $user->id,
                 'email' => $socialiteUser->getEmail()
             ]);
             $userEmail->save();
             $socialAccount = new SocialAccount();
             $socialAccount->fill([
-                'user_id' => $user->id,
+                'account_id' => $user->id,
                 'provider' => $provider,
                 'social_id' => $socialiteUser->getId(),
                 'avatar' => $socialiteUser->getAvatar(),
@@ -146,7 +146,7 @@ class AuthController extends Controller
         }
         app('db')->commit();
 
-        return response($this->authService->retrieveLoginResponse(auth()->login($user)));
+        return response($this->authService->retrieveLoginResponse(app('auth')->login($user)));
 
     }
 }

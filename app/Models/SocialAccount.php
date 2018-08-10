@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class SocialAccount extends Model
 {
-    protected $fillable = ['user_id', 'provider', 'social_id', 'avatar'];
+    protected $fillable = ['account_id', 'provider', 'social_id', 'avatar'];
 
-    public function user()
+    public function account()
     {
         return $this->belongsTo(Account::class);
     }
