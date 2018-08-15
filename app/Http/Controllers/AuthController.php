@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Application;
 use App\Models\SocialAccount;
-use App\Models\Account;
-use App\Models\AccountEmail;
-use App\Services\AuthService;
+use App\Models\User;
+use App\Models\UserEmail;
+use App\Services\Auth\Contracts\AuthManagerContract;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 
 class AuthController extends Controller
 {
 
-    protected $authService;
+    /**
+     * @var AuthManagerContract
+     */
+    protected $authManager;
 
-    public function __construct(AuthService $authService)
+    public function __construct(AuthManagerContract $authManager)
     {
-        $this->authService = $authService;
+        $this->authManager = $authManager;
     }
 
     /**
@@ -27,38 +31,37 @@ class AuthController extends Controller
     public function login(Request $request)
     {
 
+        // check if the application exists
+        $application = Application::findByName($request->get('application'));
+        if (!$application) {
+            return response(['message' => 'Bad application name.'], 404);
+        }
+
         $message = 'Invalid username or password';
 
-        // email exists?
-        if (!($email = AccountEmail::where(['email' => $request->get('email')])->with('account')->first())) {
+        // email/user exists?
+        $email = UserEmail::where(['email' => $request->get('email')])
+            ->with(['user.applications' => function ($query) use ($application) {
+                $query->where(['app_name' => $application->app_name]);
+            }])
+            ->first();
+        if (!$email) {
             return response(['message' => $message], 401);
         }
 
         // password is correct?
-        if (empty($email->account->password) || !app('hash')->check($request->get('password'), $email->account->password)) {
+        if (empty($email->user->password) || !app('hash')->check($request->get('password'), $email->user->password)) {
             return response(['message' => $message], 401);
         }
 
-        if (!$token = app('auth')->login($email->account)) {
-            return response(['message' => $message], 401);
-        }
+        // check the permissions and return
+        return $this->checkUserPermissions($application, $email->user, $request->get('role') ?? null);
 
-        return response($this->authService->retrieveLoginResponse($token));
     }
 
-    public function validateToken(\Illuminate\Http\Request $request)
+    public function validateToken()
     {
-        return app('auth')->guard()->getPayload();
-    }
-
-    /**
-     * Get the authenticated User.
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function me()
-    {
-        return response(auth()->user());
+        return $this->authManager->getToken()->getPayload();
     }
 
     /**
@@ -68,7 +71,7 @@ class AuthController extends Controller
      */
     public function logout()
     {
-        app('auth')->logout();
+        $this->authManager->logout();
 
         return response(['message' => 'Successfully logged out']);
     }
@@ -86,7 +89,7 @@ class AuthController extends Controller
 
     public function providerUrl($provider, $redirectUri = null)
     {
-        return response($this->authService->retrieveSocialLoginUrl($provider, $redirectUri));
+        return response($this->authManager->retrieveSocialLoginUrl($provider, $redirectUri));
     }
 
     public function providerUrls()
@@ -94,7 +97,7 @@ class AuthController extends Controller
         $response = [];
         foreach (app('request')->query('providers') as $providerJson) {
             $providerInfo = json_decode($providerJson);
-            $response[$providerInfo->provider] = $this->authService->retrieveSocialLoginUrl($providerInfo->provider, $providerInfo->redirectUri);
+            $response[$providerInfo->provider] = $this->authManager->retrieveSocialLoginUrl($providerInfo->provider, $providerInfo->redirectUri);
         }
         return response($response);
     }
@@ -104,36 +107,49 @@ class AuthController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function providerCallback($provider)
+    public function providerCallback(Request $request, $provider)
     {
-
-        /** @var SocialiteUser $socialiteUser */
-        $socialiteUser = $this->authService->retrieveSocialUser($provider, app('request')->query('redirectUri'));
-
-        // user already registered with this social account
-        if ($socialAccount = SocialAccount::where(['social_id' => $socialiteUser->getId()])->with('account')->first()) {
-            return response($this->authService->retrieveLoginResponse(app('auth')->login($socialAccount->account)));
+        // check if the application exists
+        $application = Application::findByName($request->get('application'));
+        if (!$application) {
+            return response(['message' => 'Bad application name.'], 404);
         }
 
-        // user not registered, but email exists
-        if (AccountEmail::where(['email' => $socialiteUser->getEmail()])->count()) {
+        /** @var SocialiteUser $socialiteUser */
+        $socialiteUser = $this->authManager->retrieveSocialUser($provider, app('request')->query('redirectUri'));
+
+        // check if the user is already registered with this social account
+        $socialAccount = SocialAccount::where(['social_id' => $socialiteUser->getId()])
+            ->with(['user.applications' => function ($query) use ($application) {
+                $query->where(['app_name' => $application->app_name]);
+            }])
+            ->first();
+        if ($socialAccount) {
+
+            return $this->checkUserPermissions($application, $socialAccount->user, $request->get('role'));
+
+        }
+
+        // user not registered, but email exists. Respond with error.
+        if (UserEmail::where(['email' => $socialiteUser->getEmail()])->count()) {
             return response(['message' => "Email {$socialiteUser->getEmail()} already used by another account."], 401);
         }
 
+        // register new user
         app('db')->beginTransaction();
         try {
 
-            $user = new Account();
+            $user = new User();
             $user->save();
-            $userEmail = new AccountEmail();
+            $userEmail = new UserEmail();
             $userEmail->fill([
-                'account_id' => $user->id,
+                'user' => $user->id,
                 'email' => $socialiteUser->getEmail()
             ]);
             $userEmail->save();
             $socialAccount = new SocialAccount();
             $socialAccount->fill([
-                'account_id' => $user->id,
+                'user_id' => $user->id,
                 'provider' => $provider,
                 'social_id' => $socialiteUser->getId(),
                 'avatar' => $socialiteUser->getAvatar(),
@@ -146,7 +162,24 @@ class AuthController extends Controller
         }
         app('db')->commit();
 
-        return response($this->authService->retrieveLoginResponse(app('auth')->login($user)));
+        return response($this->authManager->login($application, $user, 'user'));
 
+    }
+
+    protected function checkUserPermissions($application, $user, $role = null)
+    {
+        // Isn't the user linked to the application?
+        if (!$user->applications->count()) {
+            // TODO - Register the user with the application, as a simple user - returning not implemented for now
+            return response('TODO - The user is not registered with the application', 501);
+        }
+
+        // get the role (checking if the user have permission to use the role)
+        if (!($roleObject = $user->applications[0]->pivot->getRole($role))) {
+            return response(['message' => "You don't have the privileges to login as this role"], 401);
+        }
+
+        // generate the token and respond
+        return response($this->authManager->login($application, $user, $roleObject->role));
     }
 }

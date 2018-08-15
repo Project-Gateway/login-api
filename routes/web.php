@@ -23,9 +23,19 @@ $router->group(['middleware' => 'cache:public,86400'], function() use ($router) 
 });
 
 // authenticated routes
-$router->group(['middleware' => \App\Http\Middleware\Authenticate::class], function() use ($router) {
+$router->group(['middleware' => 'auth'], function() use ($router) {
     $router->post('auth/logout', 'AuthController@logout');
     $router->post('auth/refresh', 'AuthController@refresh');
     $router->get('auth/me', 'AuthController@me');
     $router->get('auth/validate', 'AuthController@validateToken');
+
+    $router->get('users', ['uses' => 'UserController@index', 'as' => 'users.index']);
+    $router->get('users/paginated', ['uses' => 'UserController@indexPaginated', 'as' => 'users.indexPaginated']);
+    $router->get('users/{id}', ['uses' => 'UserController@show', 'as' => 'users.show']);
+    $router->post('users', ['uses' => 'UserController@store', 'as' => 'users.store']);
+    $router->put('users/{id}', ['uses' => 'UserController@update', 'as' => 'users.update']);
+    $router->patch('users/{id}', ['uses' => 'UserController@update', 'as' => 'users.update']);
+    $router->delete('users/{id}', ['uses' => 'UserController@destroy', 'as' => 'users.destroy']);
+
+
 });

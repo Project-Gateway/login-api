@@ -4,13 +4,16 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class SocialAccount extends Model
+class UserEmail extends Model
 {
+
     use UuidTrait;
 
     public $incrementing = false;
 
-    protected $fillable = ['account_id', 'provider', 'social_id', 'avatar'];
+    protected $fillable = ['account_id', 'email'];
+
+    protected $hidden = ['id', 'user_id'];
 
     public function user()
     {

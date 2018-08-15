@@ -85,7 +85,7 @@ $app->register(App\Providers\AuthServiceProvider::class);
 
 $app->register(Illuminate\Redis\RedisServiceProvider::class);
 
-$app->register(Tymon\JWTAuth\Providers\LumenServiceProvider::class);
+//$app->register(Tymon\JWTAuth\Providers\LumenServiceProvider::class);
 
 $app->register(\Laravel\Socialite\SocialiteServiceProvider::class);
 
