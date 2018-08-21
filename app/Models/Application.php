@@ -4,6 +4,7 @@ namespace App\Models;
 
 
 use App\Services\Auth\Contracts\ApplicationContract;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  * @package App\Models
  * @property int $id
  * @property UserEmail[] $emails
+ * @property Collection $roles
  */
 class Application extends Model implements ApplicationContract
 {

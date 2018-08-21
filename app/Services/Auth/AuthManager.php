@@ -125,7 +125,7 @@ class AuthManager implements AuthManagerContract
         return Socialite::driver($provider)->stateless()->user();
     }
 
-    public function registerUser(string $email, string $password = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract
+    public function registerUser(string $email, string $password = null, string $role = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract
     {
         app('db')->beginTransaction();
         try {
@@ -144,8 +144,12 @@ class AuthManager implements AuthManagerContract
             $userEmail->save();
 
             // finds the application with the default role for registration
-            $application = Application::byName($this->application)->with(['roles' => function ($query) {
-                $query->where(['default' => true]);
+            $application = Application::byName($this->application)->with(['roles' => function ($query) use ($role) {
+                if (!$role) {
+                    $query->where(['default' => true]);
+                } else {
+                    $query->where(['role' => $role]);
+                }
             }])->first();
 
             // links the user to the application
@@ -184,6 +188,16 @@ class AuthManager implements AuthManagerContract
 
         app('db')->commit();
         return $user;
+    }
+
+    public function getUserId(): string
+    {
+        return $this->token->getClaimValue('sub');
+    }
+
+    public function getRole(): string
+    {
+        return preg_replace("/^{$this->application}_/", '', $this->token->getClaimValue('role'));
     }
 
 }

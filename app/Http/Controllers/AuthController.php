@@ -128,7 +128,7 @@ class AuthController extends Controller
         }
 
         // register new user
-        if (!($user = $this->authManager->registerUser($socialiteUser->getEmail(), null, $provider, $socialiteUser->getId(), $socialiteUser->getAvatar()))) {
+        if (!($user = $this->authManager->registerUser($socialiteUser->getEmail(), null, null, $provider, $socialiteUser->getId(), $socialiteUser->getAvatar()))) {
             return response(['message' => 'Can\'t create the account'], 500);
         }
 

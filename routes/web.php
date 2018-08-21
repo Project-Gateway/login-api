@@ -30,14 +30,19 @@ $router->group(['middleware' => 'auth'], function() use ($router) {
     $router->post('auth/refresh', 'AuthController@refresh');
     $router->get('auth/validate', 'AuthController@validateToken');
 
+    $uuidRegex = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
+    // User CRUD routes
     $router->get('users', ['uses' => 'UserController@index', 'as' => 'users.index']);
     $router->get('users/paginated', ['uses' => 'UserController@indexPaginated', 'as' => 'users.indexPaginated']);
-    $router->get('users/{id}', ['uses' => 'UserController@show', 'as' => 'users.show']);
+    $router->get("users/{id: $uuidRegex}", ['uses' => 'UserController@show', 'as' => 'users.show']);
     $router->post('users', ['uses' => 'UserController@store', 'as' => 'users.store']);
-    $router->put('users/{id}', ['uses' => 'UserController@update', 'as' => 'users.update']);
-    $router->patch('users/{id}', ['uses' => 'UserController@update', 'as' => 'users.update']);
-    $router->delete('users/{id}', ['uses' => 'UserController@destroy', 'as' => 'users.destroy']);
+    $router->put("users/{id:$uuidRegex}/add-emails", ['uses' => 'UserController@addEmails', 'as' => 'users.add-email']);
+    $router->put("users/{id:$uuidRegex}/remove-emails", ['uses' => 'UserController@removeEmails', 'as' => 'users.delete-email']);
+    $router->put("users/{id:$uuidRegex}/change-password", ['uses' => 'UserController@changePassword', 'as' => 'users.change-password']);
+    $router->put("users/{id:$uuidRegex}/grant", ['uses' => 'UserController@grant', 'as' => 'users.grant']);
+    $router->put("users/{id:$uuidRegex}/revoke", ['uses' => 'UserController@revoke', 'as' => 'users.revoke']);
+    $router->delete("users/{id:$uuidRegex}", ['uses' => 'UserController@destroy', 'as' => 'users.destroy']);
 
 
 });

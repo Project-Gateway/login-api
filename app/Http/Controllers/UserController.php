@@ -2,11 +2,23 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApplicationUserRole;
+use App\Models\Role;
 use App\Models\User;
+use App\Models\UserEmail;
+use App\Services\Auth\Contracts\AuthManagerContract;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+
+    protected $authManager;
+
+    public function __construct(AuthManagerContract $authManager)
+    {
+        $this->authManager = $authManager;
+    }
 
     public function index()
     {
@@ -23,38 +35,224 @@ class UserController extends Controller
 
     public function show($id)
     {
+
         $user = User::with(['emails', 'socialAccounts'])->find($id);
+
+        if (!$user) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $application = $this->authManager->getApplication();
+
+        $user->roles = $user->applications()->where(['app_name'=>$application])->first()->pivot->roles;
         return $user;
     }
 
     public function store(Request $request)
     {
 
+        $application = $this->authManager->getApplication();
+
+        /** @var Role $loggedRole */
+        $loggedRole = Role::findByRoleName($this->authManager->getRole());
+        if (!$loggedRole->can_create_users) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
+
+        $allowedRoles = $loggedRole->children->map(function ($item) {
+            return $item->role;
+        });
+
         $this->validate($request, [
-            'application' => 'required',
-            'email' => 'required|email',
+            'email' => 'required|email|unique:user_emails,email',
             'password' => 'required',
-            'role' => 'required'
+            'role' => [
+                'required',
+                function ($attribute, $value, $fail) use ($application) {
+                    $role = Role::where(['role' => $value])
+                        ->with(['applications' => function ($query) use ($application) {
+                            $query->where(['app_name' => $application]);
+                        }])
+                        ->first();
+
+                    if (!$role->applications->count()) {
+                        return $fail("$attribute not allowed to this application");
+                    }
+                },
+                Rule::in($allowedRoles)
+            ]
         ]);
 
-        $newUser = new User();
-        $newUser->fill($request->all());
-        $newUser->save();
-        return $newUser;
+        if (!($user = $this->authManager->registerUser($request->email, $request->password, $request->role))) {
+            return response(['message' => 'Error creating the user'], 500);
+        }
+
+        return $user;
     }
 
-    public function update(Request $request, $id)
+    public function addEmails(Request $request, $id)
     {
-        // validate the request
+
+        if (!User::find($id)) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $this->validate($request, [
+            'emails' => 'required|array',
+            'emails.*' => 'email|unique:user_emails,email'
+        ], [
+            'emails.*.email' => ':input is not a valid email',
+            'emails.*.unique' => ':input has already been taken'
+        ]);
+
+        $return = [];
+
+        foreach ($request->emails as $newEmail) {
+            $emailObject = new UserEmail();
+            $emailObject->email = $newEmail;
+            $emailObject->user_id = $id;
+            $emailObject->save();
+            $return[] = $emailObject;
+        }
+
+        return $return;
+
+    }
+
+    public function removeEmails(Request $request, $id)
+    {
+
+        if (!User::find($id)) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $this->validate($request, [
+            'emails' => 'required|array',
+            'emails.*' => [
+                'email',
+                Rule::exists('user_emails', 'email')->where(function($query) use ($id) {
+                    $query->where(['user_id' => $id]);
+                })
+            ]
+        ], [
+            'emails.*.email' => ':input is not a valid email',
+            'emails.*.exists' => ':input is not attached to the user'
+        ]);
+
+        UserEmail::whereIn('email', $request->emails)->delete();
+
+        return response(['message' => 'Success']);
+
+    }
+
+    public function changePassword(Request $request, $id)
+    {
 
         $user = User::find($id);
-        $user->fill($request->all());
+
+        if (!$user) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $this->validate($request, [
+            'password' => 'required'
+        ]);
+
+
+        $user->password = app('hash')->make($request->password);
         $user->save();
-        return $user;
+
+        return response(['message' => 'Success']);
+    }
+
+    public function grant(Request $request, $id)
+    {
+
+        if (!User::find($id)) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $application = $this->authManager->getApplication();
+
+        /** @var Role $loggedRole */
+        $loggedRole = Role::findByRoleName($this->authManager->getRole());
+        if (!$loggedRole->can_create_users) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
+
+        $allowedRoles = $loggedRole->children->map(function ($item) {
+            return $item->role;
+        });
+
+        $this->validate($request, [
+            'role' => [
+                'bail',
+                'required',
+                'exists:roles,role',
+                function ($attribute, $value, $fail) use ($application, &$role) {
+                    $role = Role::where(['role' => $value])
+                        ->with(['applications' => function ($query) use ($application) {
+                            $query->where(['app_name' => $application]);
+                        }])
+                        ->first();
+
+                    if (!$role || !$role->applications->count()) {
+                        return $fail("The role is not allowed to this application");
+                    }
+                },
+                Rule::in($allowedRoles)
+            ]
+        ]);
+
+        $applicationUserRole = new ApplicationUserRole();
+        $applicationUserRole->application_id = $role->applications->first()->id;
+        $applicationUserRole->user_id = $id;
+        $applicationUserRole->role_id = $role->id;
+        $applicationUserRole->default = false;
+        $applicationUserRole->save();
+
+        return response(['message' => 'Success']);
+    }
+
+    public function revoke(Request $request, $id)
+    {
+        /** @var User $user */
+        $user = User::find($id);
+
+        if (!$user) {
+            return response(['message' => 'User not found'], 404);
+        }
+
+        $applicationName = $this->authManager->getApplication();
+        $application = $user->applications()->where(['app_name'=>$applicationName])->first();
+
+        $roles = $application->pivot->roles;
+
+        $this->validate($request, [
+            'role' => [
+                'bail',
+                'required',
+                Rule::in($roles->map(function ($item) {
+                    return $item->role;
+                }))
+            ]
+        ]);
+
+        ApplicationUserRole::where([
+            'application_id' => $application->id,
+            'user_id' => $id,
+            'role_id' => $roles->filter(function ($item) use ($request) {
+                return $item->role == $request->role;
+            })->first()->id
+        ])->delete();
+
+        return response(['message' => 'Success']);
+
     }
 
     public function destroy($id)
     {
+        // TODO - Destroy everything
         User::destroy($id);
         return "User $id deleted.";
     }

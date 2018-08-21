@@ -17,7 +17,9 @@ class CreateRolesTable extends Migration
             $table->uuid('id');
             $table->primary('id');
             $table->string('role')->unique();
-
+            $table->uuid('parent_role_id')->nullable();
+            $table->boolean('can_create_users')->default('false');
+            $table->foreign('parent_role_id')->references('id')->on('roles');
             $table->timestamps();
         });
     }

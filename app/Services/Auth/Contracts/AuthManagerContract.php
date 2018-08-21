@@ -28,6 +28,10 @@ interface AuthManagerContract
 
     public function retrieveSocialUser($provider, $redirectUri = null);
 
-    public function registerUser(string $email, string $password = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract;
+    public function registerUser(string $email, string $password = null, string $role = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract;
+
+    public function getUserId(): string;
+
+    public function getRole(): string;
 
 }
