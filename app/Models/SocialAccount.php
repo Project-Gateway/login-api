@@ -10,7 +10,7 @@ class SocialAccount extends Model
 
     public $incrementing = false;
 
-    protected $fillable = ['account_id', 'provider', 'social_id', 'avatar'];
+    protected $fillable = ['user_id', 'provider', 'social_id', 'avatar'];
 
     public function user()
     {

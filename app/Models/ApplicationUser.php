@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class ApplicationUser extends Pivot
 {
 
+    public $incrementing = false;
+
     /**
      * Many to many relation with Role model.
      * A little hacky, cause Eloquent don't handles relations with composite keys very well,
@@ -24,7 +26,7 @@ class ApplicationUser extends Pivot
      */
     public function roles()
     {
-        $relation = $this->belongsToMany(Role::class);
+        $relation = $this->belongsToMany(Role::class)->withPivot('default');
         $relation->getQuery()->getQuery()->wheres = [];
         $relation->where([
             'application_user_role.application_id' => $this->application_id,

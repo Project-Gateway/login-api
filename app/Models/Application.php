@@ -27,13 +27,31 @@ class Application extends Model implements ApplicationContract
         'app_name',
     ];
 
-    public static function findByName($name)
+    /**
+     * Scope a query to only include the applications of one name
+     *
+     * @param \Illuminate\Database\Eloquent\Builder $query
+     * @param mixed $name
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeByName($query, $name)
     {
-        return static::where(['app_name' => $name])->first();
+        return $query->where(['app_name' => $name]);
     }
 
     public function getName(): string
     {
         return $this->app_name;
     }
+
+    public function roles()
+    {
+        return $this->belongsToMany(Role::class);
+    }
+
+    public function defaultRole()
+    {
+        return $this->roles()->where(['default' => true]);
+    }
+
 }

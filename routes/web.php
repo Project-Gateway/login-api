@@ -18,16 +18,18 @@ $router->get('echo/{value}', function ($value) {
 $router->post('auth/login', 'AuthController@login');
 $router->get('auth/{provider}/url', 'AuthController@providerUrl');
 $router->get('auth/login/{provider}', 'AuthController@providerCallback');
+$router->post('auth/register', 'AuthController@register');
 $router->group(['middleware' => 'cache:public,86400'], function() use ($router) {
     $router->get('auth/social/urls', 'AuthController@providerUrls');
 });
 
 // authenticated routes
 $router->group(['middleware' => 'auth'], function() use ($router) {
+
     $router->post('auth/logout', 'AuthController@logout');
     $router->post('auth/refresh', 'AuthController@refresh');
-    $router->get('auth/me', 'AuthController@me');
     $router->get('auth/validate', 'AuthController@validateToken');
+
 
     $router->get('users', ['uses' => 'UserController@index', 'as' => 'users.index']);
     $router->get('users/paginated', ['uses' => 'UserController@indexPaginated', 'as' => 'users.indexPaginated']);

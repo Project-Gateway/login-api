@@ -92,7 +92,8 @@ $app->register(\Laravel\Socialite\SocialiteServiceProvider::class);
 $app->register(\App\Overrides\Clockwork\ClockworkServiceProvider::class);
 
 $app->middleware([
-    Clockwork\Support\Lumen\ClockworkMiddleware::class
+    Clockwork\Support\Lumen\ClockworkMiddleware::class,
+    \App\Http\Middleware\CheckAppHeader::class
 ]);
 
 $app->configure('services');

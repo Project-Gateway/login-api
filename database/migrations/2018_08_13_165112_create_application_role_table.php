@@ -16,6 +16,7 @@ class CreateApplicationRoleTable extends Migration
         Schema::create('application_role', function (Blueprint $table) {
             $table->uuid('application_id');
             $table->uuid('role_id');
+            $table->boolean('default')->default(false);
             $table->primary(['application_id', 'role_id']);
             $table->timestamps();
 

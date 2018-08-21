@@ -14,7 +14,7 @@ return [
     */
 
     'defaults' => [
-        'guard' => 'api',
+        'guard' => env('AUTH_GUARD', 'api'),
     ],
 
     /*
@@ -35,10 +35,7 @@ return [
     */
 
     'guards' => [
-        'api' => [
-            'driver' => 'jwt',
-            'provider' => 'users'
-        ],
+        'api' => ['driver' => 'api'],
     ],
 
     /*
@@ -59,10 +56,7 @@ return [
     */
 
     'providers' => [
-        'users' => [
-            'driver' => 'eloquent',
-            'model' => App\Models\User::class,
-        ],
+        //
     ],
 
     /*
@@ -87,5 +81,8 @@ return [
     'passwords' => [
         //
     ],
+
+
+    'applicationHeader' => env('AUTH_APP_HEADER', 'X-Orion-Application'),
 
 ];

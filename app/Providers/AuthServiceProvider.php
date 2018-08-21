@@ -49,11 +49,21 @@ class AuthServiceProvider extends ServiceProvider
                 return null;
             }
 
+            // The client application header is present?
+            if (!($appName = $request->header(config('auth.applicationHeader')))) {
+                return null;
+            }
+
             // extract the token from header
             $token = trim(preg_replace('/^\s*bearer/i', '', $authHeader));
 
             // parses the token
             if (!($tokenObject = $this->app->make(TokenFactoryContract::class)->parse($token))) {
+                return null;
+            }
+
+            // check if is the correct audience (application)
+            if ($tokenObject->getClaimValue('aud') !== $appName) {
                 return null;
             }
 
@@ -63,6 +73,7 @@ class AuthServiceProvider extends ServiceProvider
                 return null;
             }
 
+            $authManager->setApplication($appName);
             $authManager->setToken($tokenObject);
 
             return $tokenObject;

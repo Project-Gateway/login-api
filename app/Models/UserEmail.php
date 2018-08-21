@@ -11,7 +11,7 @@ class UserEmail extends Model
 
     public $incrementing = false;
 
-    protected $fillable = ['account_id', 'email'];
+    protected $fillable = ['user_id', 'email'];
 
     protected $hidden = ['id', 'user_id'];
 

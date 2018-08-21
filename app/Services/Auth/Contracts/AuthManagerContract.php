@@ -16,12 +16,18 @@ interface AuthManagerContract
 
     public function getToken(): ?TokenContract;
 
-    public function setToken(TokenContract $token);
+    public function setToken(TokenContract $token): void;
+
+    public function getApplication(): string;
+
+    public function setApplication(string $application): void;
 
     public function check(TokenContract $token): bool;
 
     public function retrieveSocialLoginUrl($provider, $redirectUri = null): ?string;
 
     public function retrieveSocialUser($provider, $redirectUri = null);
+
+    public function registerUser(string $email, string $password = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract;
 
 }

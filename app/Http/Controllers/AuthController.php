@@ -2,9 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
 use App\Models\SocialAccount;
-use App\Models\User;
 use App\Models\UserEmail;
 use App\Services\Auth\Contracts\AuthManagerContract;
 use Illuminate\Http\Request;
@@ -31,18 +29,15 @@ class AuthController extends Controller
     public function login(Request $request)
     {
 
-        // check if the application exists
-        $application = Application::findByName($request->get('application'));
-        if (!$application) {
-            return response(['message' => 'Bad application name.'], 404);
-        }
+        // get the application name
+        $applicationName = $this->authManager->getApplication();
 
         $message = 'Invalid username or password';
 
-        // email/user exists?
+        // email/user exists? If yes, get the email linked with the user and current application
         $email = UserEmail::where(['email' => $request->get('email')])
-            ->with(['user.applications' => function ($query) use ($application) {
-                $query->where(['app_name' => $application->app_name]);
+            ->with(['user.applications' => function ($query) use ($applicationName) {
+                $query->where(['app_name' => $applicationName]);
             }])
             ->first();
         if (!$email) {
@@ -55,7 +50,7 @@ class AuthController extends Controller
         }
 
         // check the permissions and return
-        return $this->checkUserPermissions($application, $email->user, $request->get('role') ?? null);
+        return $this->checkUserPermissions($email->user, $request->get('role') ?? null);
 
     }
 
@@ -109,24 +104,21 @@ class AuthController extends Controller
      */
     public function providerCallback(Request $request, $provider)
     {
-        // check if the application exists
-        $application = Application::findByName($request->get('application'));
-        if (!$application) {
-            return response(['message' => 'Bad application name.'], 404);
-        }
+        // get the application name
+        $applicationName = $this->authManager->getApplication();
 
         /** @var SocialiteUser $socialiteUser */
         $socialiteUser = $this->authManager->retrieveSocialUser($provider, app('request')->query('redirectUri'));
 
         // check if the user is already registered with this social account
         $socialAccount = SocialAccount::where(['social_id' => $socialiteUser->getId()])
-            ->with(['user.applications' => function ($query) use ($application) {
-                $query->where(['app_name' => $application->app_name]);
+            ->with(['user.applications' => function ($query) use ($applicationName) {
+                $query->where(['app_name' => $applicationName]);
             }])
             ->first();
         if ($socialAccount) {
 
-            return $this->checkUserPermissions($application, $socialAccount->user, $request->get('role'));
+            return $this->checkUserPermissions($socialAccount->user, $request->get('role'));
 
         }
 
@@ -136,46 +128,41 @@ class AuthController extends Controller
         }
 
         // register new user
-        app('db')->beginTransaction();
-        try {
-
-            $user = new User();
-            $user->save();
-            $userEmail = new UserEmail();
-            $userEmail->fill([
-                'user' => $user->id,
-                'email' => $socialiteUser->getEmail()
-            ]);
-            $userEmail->save();
-            $socialAccount = new SocialAccount();
-            $socialAccount->fill([
-                'user_id' => $user->id,
-                'provider' => $provider,
-                'social_id' => $socialiteUser->getId(),
-                'avatar' => $socialiteUser->getAvatar(),
-            ]);
-            $socialAccount->save();
-
-        } catch (\Exception $e) {
-            app('db')->rollBack();
+        if (!($user = $this->authManager->registerUser($socialiteUser->getEmail(), null, $provider, $socialiteUser->getId(), $socialiteUser->getAvatar()))) {
             return response(['message' => 'Can\'t create the account'], 500);
         }
-        app('db')->commit();
 
-        return response($this->authManager->login($application, $user, 'user'));
+        return $this->checkUserPermissions($user);
 
     }
 
-    protected function checkUserPermissions($application, $user, $role = null)
+    public function register(Request $request)
     {
+        $this->validate($request, [
+            'email' => 'required|email|unique:user_emails,email',
+            'password' => 'required',
+        ]);
+
+        if (!($user = $this->authManager->registerUser($request->get('email'), $request->get('password')))) {
+            return response(['message' => 'Can\'t create the account'], 500);
+        }
+
+        return $this->checkUserPermissions($user);
+
+    }
+
+    protected function checkUserPermissions($user, $role = null)
+    {
+        $application = $user->applications->first() ?? null;
+
         // Isn't the user linked to the application?
-        if (!$user->applications->count()) {
+        if (!$application) {
             // TODO - Register the user with the application, as a simple user - returning not implemented for now
             return response('TODO - The user is not registered with the application', 501);
         }
 
         // get the role (checking if the user have permission to use the role)
-        if (!($roleObject = $user->applications[0]->pivot->getRole($role))) {
+        if (!($roleObject = $application->pivot->getRole($role))) {
             return response(['message' => "You don't have the privileges to login as this role"], 401);
         }
 

@@ -2,6 +2,12 @@
 
 namespace App\Services\Auth;
 
+use App\Models\Application;
+use App\Models\ApplicationUser;
+use App\Models\ApplicationUserRole;
+use App\Models\SocialAccount;
+use App\Models\User;
+use App\Models\UserEmail;
 use App\Services\Auth\Contracts\ApplicationContract;
 use App\Services\Auth\Contracts\AuthManagerContract;
 use App\Services\Auth\Contracts\UserContract;
@@ -27,6 +33,11 @@ class AuthManager implements AuthManagerContract
      * @var TokenContract
      */
     protected $token = null;
+
+    /**
+     * @var string
+     */
+    protected $application = null;
 
     public function __construct(TokenFactoryContract $tokenFactory, WhitelistContract $whitelist)
     {
@@ -54,7 +65,7 @@ class AuthManager implements AuthManagerContract
         $this->token = $token;
 
         return [
-            'accessToken' => (string) $token,
+            'accessToken' => (string)$token,
             'tokenType' => 'bearer',
             'expiresIn' => $token->getClaimValue('exp') - time(),
             'emails' => $emails,
@@ -66,9 +77,19 @@ class AuthManager implements AuthManagerContract
         return $this->token;
     }
 
-    public function setToken(TokenContract $token)
+    public function setToken(TokenContract $token): void
     {
         $this->token = $token;
+    }
+
+    public function getApplication(): string
+    {
+        return $this->application;
+    }
+
+    public function setApplication(string $application): void
+    {
+        $this->application = $application;
     }
 
     public function check(TokenContract $token): bool
@@ -102,6 +123,67 @@ class AuthManager implements AuthManagerContract
         $socialite = Socialite::driver($provider);
         $socialite->redirectUrl($redirectUri);
         return Socialite::driver($provider)->stateless()->user();
+    }
+
+    public function registerUser(string $email, string $password = null, $socialProvider = null, $socialId = null, $avatar = null): ?UserContract
+    {
+        app('db')->beginTransaction();
+        try {
+
+            // creates the user
+            $user = new User();
+            $user->password = $password ? app('hash')->make($password) : null;
+            $user->save();
+
+            // creates the userEmail entry, linked to the user
+            $userEmail = new UserEmail();
+            $userEmail->fill([
+                'user_id' => $user->id,
+                'email' => $email
+            ]);
+            $userEmail->save();
+
+            // finds the application with the default role for registration
+            $application = Application::byName($this->application)->with(['roles' => function ($query) {
+                $query->where(['default' => true]);
+            }])->first();
+
+            // links the user to the application
+            $applicationUser = new ApplicationUser();
+            $applicationUser->application_id = $application->id;
+            $applicationUser->user_id = $user->id;
+            $applicationUser->save();
+
+            // links the user/application to the role
+            $applicationUserRole = new ApplicationUserRole();
+            $applicationUserRole->application_id = $application->id;
+            $applicationUserRole->user_id = $user->id;
+            $applicationUserRole->role_id = $application->roles->first()->id;
+            $applicationUserRole->default = true;
+            $applicationUserRole->save();
+
+            // if it's a social register, creates the social account entry
+            if ($socialProvider) {
+
+                $socialAccount = new SocialAccount();
+                $socialAccount->fill([
+                    'user_id' => $user->id,
+                    'provider' => $socialProvider,
+                    'social_id' => $socialId,
+                    'avatar' => $avatar,
+                ]);
+                $socialAccount->save();
+            }
+
+        } catch (\Exception $e) {
+            app('db')->rollBack();
+            //throw $e;
+            // TODO - log the exception
+            return null;
+        }
+
+        app('db')->commit();
+        return $user;
     }
 
 }
