@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Models\Application;
 use App\Models\ApplicationUser;
 use App\Models\ApplicationUserRole;
+use App\Models\Role;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\UserEmail;
@@ -198,6 +199,19 @@ class AuthManager implements AuthManagerContract
     public function getRole(): string
     {
         return preg_replace("/^{$this->application}_/", '', $this->token->getClaimValue('role'));
+    }
+
+    public function getChildRoles(): array
+    {
+        /** @var Role $loggedRole */
+        $loggedRole = Role::findByRoleName($this->getRole());
+        if (!$loggedRole->can_create_users) {
+            return [];
+        }
+
+        return $loggedRole->children->map(function ($item) {
+            return $item->role;
+        })->toArray();
     }
 
 }

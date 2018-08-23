@@ -34,4 +34,6 @@ interface AuthManagerContract
 
     public function getRole(): string;
 
+    public function getChildRoles(): array;
+
 }
