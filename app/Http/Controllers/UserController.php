@@ -28,7 +28,7 @@ class UserController extends Controller
     public function indexPaginated(Request $request)
     {
 
-        $pages = $request->query->pages ?? 20;
+        $pages = $request->query('pages') ?? 20;
 
         return User::with(['emails', 'socialAccounts'])->paginate($pages);
     }
