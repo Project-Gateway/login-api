@@ -167,6 +167,6 @@ class AuthController extends Controller
         }
 
         // generate the token and respond
-        return response($this->authManager->login($application, $user, $roleObject->role));
+        return response($this->authManager->login($application, $user, $roleObject));
     }
 }

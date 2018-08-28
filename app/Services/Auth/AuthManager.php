@@ -46,13 +46,17 @@ class AuthManager implements AuthManagerContract
         $this->whiteList = $whitelist;
     }
 
-    public function login(ApplicationContract $application, UserContract $user, string $role): array
+    public function login(ApplicationContract $application, UserContract $user, Role $role): array
     {
         $emails = $user->getAllEmails();
-        $role = $application->getName() . '_' . $role;
+        $databaseRole = $application->getName() . '_' . $role;
         $token = $this->tokenFactory->build($application->getName(), $user->getId(), [
             'emails' => $emails,
-            'role' => $role
+            'dbRole'=> $databaseRole,
+            'role' => $role->role,
+            'childRoles' => $role->children->map(function($item) {
+                return $item->role;
+            })
         ]);
 
         // check if the token is on the whitelist, if it is, use the cached one
