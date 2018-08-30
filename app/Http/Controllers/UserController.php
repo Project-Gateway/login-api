@@ -28,7 +28,7 @@ class UserController extends Controller
     public function indexPaginated(Request $request)
     {
 
-        $pages = $request->query->pages ?? 20;
+        $pages = $request->query('pages') ?? 20;
 
         return User::with(['emails', 'socialAccounts'])->paginate($pages);
     }
@@ -51,17 +51,11 @@ class UserController extends Controller
     public function store(Request $request)
     {
 
-        $application = $this->authManager->getApplication();
-
-        /** @var Role $loggedRole */
-        $loggedRole = Role::findByRoleName($this->authManager->getRole());
-        if (!$loggedRole->can_create_users) {
+        if (empty($allowedRoles = $this->authManager->getChildRoles())) {
             return response(['message' => 'Unauthorized'], 401);
         }
 
-        $allowedRoles = $loggedRole->children->map(function ($item) {
-            return $item->role;
-        });
+        $application = $this->authManager->getApplication();
 
         $this->validate($request, [
             'email' => 'required|email|unique:user_emails,email',
@@ -87,11 +81,15 @@ class UserController extends Controller
             return response(['message' => 'Error creating the user'], 500);
         }
 
-        return $user;
+        return response($user, 201);
     }
 
     public function addEmails(Request $request, $id)
     {
+
+        if (empty($this->authManager->getChildRoles())) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
 
         if (!User::find($id)) {
             return response(['message' => 'User not found'], 404);
@@ -115,12 +113,16 @@ class UserController extends Controller
             $return[] = $emailObject;
         }
 
-        return $return;
+        return response($return, 201);
 
     }
 
     public function removeEmails(Request $request, $id)
     {
+
+        if (empty($this->authManager->getChildRoles())) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
 
         if (!User::find($id)) {
             return response(['message' => 'User not found'], 404);
@@ -139,14 +141,26 @@ class UserController extends Controller
             'emails.*.exists' => ':input is not attached to the user'
         ]);
 
+        app('db')->beginTransaction();
+
         UserEmail::whereIn('email', $request->emails)->delete();
 
-        return response(['message' => 'Success']);
+        if (!UserEmail::where(['user_id' => $id])->count()) {
+            app('db')->rollBack();
+            return response(['message' => 'You can\'t remove all the emails of an user'], 400);
+        }
+
+        app('db')->commit();
+
+        return response(null, 204);
 
     }
 
     public function changePassword(Request $request, $id)
     {
+        if (empty($this->authManager->getChildRoles())) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
 
         $user = User::find($id);
 
@@ -162,27 +176,21 @@ class UserController extends Controller
         $user->password = app('hash')->make($request->password);
         $user->save();
 
-        return response(['message' => 'Success']);
+        return response(null, 204);
     }
 
     public function grant(Request $request, $id)
     {
+
+        if (empty($allowedRoles = $this->authManager->getChildRoles())) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
 
         if (!User::find($id)) {
             return response(['message' => 'User not found'], 404);
         }
 
         $application = $this->authManager->getApplication();
-
-        /** @var Role $loggedRole */
-        $loggedRole = Role::findByRoleName($this->authManager->getRole());
-        if (!$loggedRole->can_create_users) {
-            return response(['message' => 'Unauthorized'], 401);
-        }
-
-        $allowedRoles = $loggedRole->children->map(function ($item) {
-            return $item->role;
-        });
 
         $this->validate($request, [
             'role' => [
@@ -211,11 +219,15 @@ class UserController extends Controller
         $applicationUserRole->default = false;
         $applicationUserRole->save();
 
-        return response(['message' => 'Success']);
+        return response(null, 204);
     }
 
     public function revoke(Request $request, $id)
     {
+        if (empty($allowedRoles = $this->authManager->getChildRoles())) {
+            return response(['message' => 'Unauthorized'], 401);
+        }
+
         /** @var User $user */
         $user = User::find($id);
 
@@ -234,7 +246,8 @@ class UserController extends Controller
                 'required',
                 Rule::in($roles->map(function ($item) {
                     return $item->role;
-                }))
+                })),
+                Rule::in($allowedRoles)
             ]
         ]);
 
@@ -246,7 +259,7 @@ class UserController extends Controller
             })->first()->id
         ])->delete();
 
-        return response(['message' => 'Success']);
+        return response(null, 204);
 
     }
 

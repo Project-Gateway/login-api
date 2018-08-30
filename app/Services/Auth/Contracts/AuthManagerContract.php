@@ -2,6 +2,7 @@
 
 namespace App\Services\Auth\Contracts;
 
+use App\Models\Role;
 use App\Services\Jwt\Contracts\TokenContract;
 use App\Services\Jwt\Contracts\TokenFactoryContract;
 
@@ -10,7 +11,7 @@ interface AuthManagerContract
 
     public function __construct(TokenFactoryContract $tokenFactory, WhitelistContract $whitelist);
 
-    public function login(ApplicationContract $application, UserContract $user, string $role): array;
+    public function login(ApplicationContract $application, UserContract $user, Role $role): array;
 
     public function logout();
 
@@ -33,5 +34,7 @@ interface AuthManagerContract
     public function getUserId(): string;
 
     public function getRole(): string;
+
+    public function getChildRoles(): array;
 
 }

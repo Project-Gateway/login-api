@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Models\Application;
 use App\Models\ApplicationUser;
 use App\Models\ApplicationUserRole;
+use App\Models\Role;
 use App\Models\SocialAccount;
 use App\Models\User;
 use App\Models\UserEmail;
@@ -45,13 +46,17 @@ class AuthManager implements AuthManagerContract
         $this->whiteList = $whitelist;
     }
 
-    public function login(ApplicationContract $application, UserContract $user, string $role): array
+    public function login(ApplicationContract $application, UserContract $user, Role $role): array
     {
         $emails = $user->getAllEmails();
-        $role = $application->getName() . '_' . $role;
+        $databaseRole = $application->getName() . '_' . $role;
         $token = $this->tokenFactory->build($application->getName(), $user->getId(), [
             'emails' => $emails,
-            'role' => $role
+            'dbRole'=> $databaseRole,
+            'role' => $role->role,
+            'childRoles' => $role->children->map(function($item) {
+                return $item->role;
+            })
         ]);
 
         // check if the token is on the whitelist, if it is, use the cached one
@@ -198,6 +203,19 @@ class AuthManager implements AuthManagerContract
     public function getRole(): string
     {
         return preg_replace("/^{$this->application}_/", '', $this->token->getClaimValue('role'));
+    }
+
+    public function getChildRoles(): array
+    {
+        /** @var Role $loggedRole */
+        $loggedRole = Role::findByRoleName($this->getRole());
+        if (!$loggedRole->can_create_users) {
+            return [];
+        }
+
+        return $loggedRole->children->map(function ($item) {
+            return $item->role;
+        })->toArray();
     }
 
 }
