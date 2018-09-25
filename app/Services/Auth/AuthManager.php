@@ -56,7 +56,10 @@ class AuthManager implements AuthManagerContract
             'role' => $role->role,
             'childRoles' => $role->children->map(function($item) {
                 return $item->role;
-            })
+            }),
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'phone' => $user->phone
         ]);
 
         // check if the token is on the whitelist, if it is, use the cached one

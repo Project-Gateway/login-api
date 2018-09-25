@@ -10,6 +10,9 @@ use Illuminate\Database\Eloquent\Model;
  * Class User
  * @package App\Models
  * @property int $id
+ * @property string $first_name
+ * @property string $last_name
+ * @property string $phone
  * @property UserEmail[] $emails
  */
 class User extends Model implements UserContract
