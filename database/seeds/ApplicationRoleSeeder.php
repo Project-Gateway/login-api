@@ -25,6 +25,12 @@ class ApplicationRoleSeeder extends Seeder
             ['9c623080-9dac-11e8-ae88-fb267a8a82d8', '06627190-9f1b-11e8-8527-0f0e8792cfcc', true], // customer
             ['9c623080-9dac-11e8-ae88-fb267a8a82d8', '0c36d700-9f1b-11e8-862d-e71c4e23d106', false], // owner
             ['9c623080-9dac-11e8-ae88-fb267a8a82d8', '16e2a250-9f1b-11e8-8b6e-0d50a48591e5', false], // driver
+
+            // nicegym
+            ['a1b8b980-d346-11e8-ab92-5bf2862614e0', 'f9d69440-9f1a-11e8-a282-ed05523a925f', false], // root
+            ['a1b8b980-d346-11e8-ab92-5bf2862614e0', '0054f7b0-9f1b-11e8-adb5-ed6931b40c8e', false], // admin
+            ['a1b8b980-d346-11e8-ab92-5bf2862614e0', '06627190-9f1b-11e8-8527-0f0e8792cfcc', true], // customer
+            ['a1b8b980-d346-11e8-ab92-5bf2862614e0', 'cff3be20-d346-11e8-a478-4f6f6c3dab75', false], // professional
         ];
 
         $this->seedData('application_role', $fields, $data, ['application_id', 'role_id']);

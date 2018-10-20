@@ -18,6 +18,8 @@ class RolesSeeder extends Seeder
             ['0c36d700-9f1b-11e8-862d-e71c4e23d106', 'owner', '0054f7b0-9f1b-11e8-adb5-ed6931b40c8e', false],
             ['1173e540-9f1b-11e8-a4e7-13f40fb68bc5', 'captain', '0054f7b0-9f1b-11e8-adb5-ed6931b40c8e', false],
             ['16e2a250-9f1b-11e8-8b6e-0d50a48591e5', 'driver', '0054f7b0-9f1b-11e8-adb5-ed6931b40c8e', false],
+            ['cff3be20-d346-11e8-a478-4f6f6c3dab75', 'professional', '0054f7b0-9f1b-11e8-adb5-ed6931b40c8e', false],
+
         ];
 
         $this->seedData('roles', $fields, $data);

@@ -14,6 +14,7 @@ class ApplicationsSeeder extends Seeder
             ['34b00a60-9dac-11e8-885f-cf7934a49f67', 'niceboat'],
             ['9c623080-9dac-11e8-ae88-fb267a8a82d8', 'nicelimo'],
             ['4fdf41b0-9fca-11e8-887d-f51069175afa', 'nicetaxi'],
+            ['a1b8b980-d346-11e8-ab92-5bf2862614e0', 'nicegym'],
         ];
 
         $this->seedData('applications', $fields, $data);
