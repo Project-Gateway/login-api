@@ -66,4 +66,32 @@ class User extends Model implements UserContract
             return $item->email;
         });
     }
+
+    public function scopeByApplication($query, $application)
+    {
+        return $query
+            ->join('application_user', ['application_user.user_id' => 'users.id'])
+            ->join('applications', ['application_user.application_id' => 'applications.id'])
+            ->where('applications.app_name', $application);
+    }
+
+    public function scopeByRole($query, $role, $application = null)
+    {
+        $query
+            ->join('application_user', ['application_user.user_id' => 'users.id'])
+            ->join('applications', ['application_user.application_id' => 'applications.id'])
+            ->join('application_user_role', [
+                'application_user_role.application_id' => 'application_user.application_id',
+                'application_user_role.user_id' => 'application_user.user_id'
+            ])
+            ->join('roles', ['roles.id' => 'application_user_role.role_id'])
+            ->where('roles.role', $role)
+            ->select('users.*');
+
+        if ($application !== null) {
+            $query->where('applications.app_name', $application);
+        }
+
+        return $query;
+    }
 }

@@ -43,6 +43,6 @@ $router->group(['middleware' => 'auth'], function() use ($router) {
     $router->put("users/{id:$uuidRegex}/grant", ['uses' => 'UserController@grant', 'as' => 'users.grant']);
     $router->put("users/{id:$uuidRegex}/revoke", ['uses' => 'UserController@revoke', 'as' => 'users.revoke']);
     $router->delete("users/{id:$uuidRegex}", ['uses' => 'UserController@destroy', 'as' => 'users.destroy']);
-
+    $router->get("users/by-role/{role}", ['uses' => 'UserController@byRole', 'as' => 'users.by-role']);
 
 });

@@ -269,4 +269,9 @@ class UserController extends Controller
         User::destroy($id);
         return "User $id deleted.";
     }
+
+    public function byRole($role)
+    {
+        return User::byRole($role, $this->authManager->getApplication())->get();
+    }
 }
